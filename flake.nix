@@ -57,12 +57,10 @@
                 nix build
               '')
             ];
-            DATABASE_URL = "postgres://postgres:postgres@localhost:5432/habits_axum";
-            CORS_ORIGINS = "http://habits.lcl:3000,http://localhost:3000";
+            DATABASE_URL = "postgres://postgres:postgres@localhost:5432/grow_axum";
+            CORS_ORIGINS = "http://grow.localhost:3000,http://localhost:3000";
             RUST_LOG = "info";
             JWT_SECRET = "very secret";
-            TELEGRAM_BOT_TOKEN = "";
-            TELEGRAM_BOT_USERNAME = "";
             RUSTFLAGS = "--cfg tokio_unstable";
           };
         }
