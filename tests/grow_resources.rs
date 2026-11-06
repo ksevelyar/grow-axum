@@ -447,8 +447,10 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
     .fetch_one(&pool)
     .await
     .unwrap();
-    let photo_path = photo_storage_directory.join(photo_storage_key);
+    let photo_path = photo_storage_directory.join(&photo_storage_key);
+    let thumbnail_path = photo_storage_directory.join(format!("{photo_storage_key}.thumbnail.jpg"));
     assert!(tokio::fs::try_exists(&photo_path).await.unwrap());
+    assert!(tokio::fs::try_exists(&thumbnail_path).await.unwrap());
 
     let gallery_response = send_json_request(
         &application,
@@ -460,7 +462,10 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
     .await;
     let gallery_logs = read_json_body(gallery_response).await;
     assert_eq!(gallery_logs.as_array().unwrap().len(), 1);
-    assert_eq!(gallery_logs[0]["newest_entry_photo_id"], photo_id);
+    assert_eq!(
+        gallery_logs[0]["thumbnail_url"],
+        format!("/photos/{photo_id}/thumbnail")
+    );
     let log_detail_response = send_json_request(
         &application,
         Method::GET,
@@ -481,6 +486,14 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
         ["bloom", "vegetation", "seedling", "germination"]
     );
     assert_eq!(log_detail["entries"][0]["photos"][0]["id"], photo_id);
+    assert_eq!(
+        log_detail["entries"][0]["photos"][0]["url"],
+        format!("/photos/{photo_id}")
+    );
+    assert_eq!(
+        log_detail["entries"][0]["photos"][0]["thumbnail_url"],
+        format!("/photos/{photo_id}/thumbnail")
+    );
 
     let photo_access_by_other_user = send_json_request(
         &application,
@@ -491,6 +504,44 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
     )
     .await;
     assert_eq!(photo_access_by_other_user.status(), StatusCode::NOT_FOUND);
+    let thumbnail_access_by_other_user = send_json_request(
+        &application,
+        Method::GET,
+        &format!("/photos/{photo_id}/thumbnail"),
+        Value::Null,
+        Some(&other_user_cookie),
+    )
+    .await;
+    assert_eq!(
+        thumbnail_access_by_other_user.status(),
+        StatusCode::NOT_FOUND
+    );
+    let thumbnail_response = send_json_request(
+        &application,
+        Method::GET,
+        &format!("/photos/{photo_id}/thumbnail"),
+        Value::Null,
+        Some(&owner_cookie),
+    )
+    .await;
+    assert_eq!(thumbnail_response.status(), StatusCode::OK);
+    assert_eq!(
+        thumbnail_response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .unwrap(),
+        "image/jpeg"
+    );
+    let thumbnail_bytes = thumbnail_response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let decoded_thumbnail = image::load_from_memory(&thumbnail_bytes).unwrap();
+    assert!(decoded_thumbnail.width() <= 1024);
+    assert!(decoded_thumbnail.height() <= 1024);
+    assert_ne!(thumbnail_bytes, PHOTO_FIXTURE_BYTES);
     let photo_response = send_json_request(
         &application,
         Method::GET,
@@ -550,6 +601,7 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
             .await
             .unwrap();
     assert_eq!(remaining_photo_count, 0);
+    assert!(!tokio::fs::try_exists(thumbnail_path).await.unwrap());
     tokio::fs::remove_dir_all(photo_storage_directory)
         .await
         .unwrap_or(());
@@ -642,8 +694,10 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
     .fetch_one(&pool)
     .await
     .unwrap();
-    let photo_path = photo_storage_directory.join(photo_storage_key);
+    let photo_path = photo_storage_directory.join(&photo_storage_key);
+    let thumbnail_path = photo_storage_directory.join(format!("{photo_storage_key}.thumbnail.jpg"));
     assert!(tokio::fs::try_exists(&photo_path).await.unwrap());
+    assert!(tokio::fs::try_exists(&thumbnail_path).await.unwrap());
     let foreign_photo_delete = send_json_request(
         &application,
         Method::DELETE,
@@ -663,6 +717,7 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
     )
     .await;
     assert_eq!(photo_delete.status(), StatusCode::NO_CONTENT);
+    assert!(!tokio::fs::try_exists(thumbnail_path).await.unwrap());
 
     let entry_photo_response = create_photo(
         &application,
@@ -679,7 +734,10 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
     .fetch_one(&pool)
     .await
     .unwrap();
-    let entry_photo_path = photo_storage_directory.join(entry_photo_storage_key);
+    let entry_photo_path = photo_storage_directory.join(&entry_photo_storage_key);
+    let entry_thumbnail_path =
+        photo_storage_directory.join(format!("{entry_photo_storage_key}.thumbnail.jpg"));
+    assert!(tokio::fs::try_exists(&entry_thumbnail_path).await.unwrap());
     let entry_delete = send_json_request(
         &application,
         Method::DELETE,
@@ -690,6 +748,7 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
     .await;
     assert_eq!(entry_delete.status(), StatusCode::NO_CONTENT);
     assert!(!tokio::fs::try_exists(entry_photo_path).await.unwrap());
+    assert!(!tokio::fs::try_exists(entry_thumbnail_path).await.unwrap());
     tokio::fs::remove_dir_all(photo_storage_directory)
         .await
         .unwrap_or(());

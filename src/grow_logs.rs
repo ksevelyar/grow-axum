@@ -26,7 +26,7 @@ pub struct GrowLog {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct GrowLogSummary {
     pub id: i64,
     pub plant_id: i64,
@@ -35,10 +35,45 @@ pub struct GrowLogSummary {
     pub description: Option<String>,
     pub ended_at: Option<DateTime<Utc>>,
     pub outcome: Option<String>,
-    pub plant_name: String,
-    pub newest_entry_photo_id: Option<i64>,
+    pub thumbnail_url: Option<String>,
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct GrowLogSummaryRow {
+    id: i64,
+    plant_id: i64,
+    name: String,
+    started_at: DateTime<Utc>,
+    description: Option<String>,
+    ended_at: Option<DateTime<Utc>>,
+    outcome: Option<String>,
+    thumbnail_photo_id: Option<i64>,
+    inserted_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl GrowLogSummaryRow {
+    fn into_grow_log_summary(self) -> GrowLogSummary {
+        let thumbnail_url = self
+            .thumbnail_photo_id
+            .as_ref()
+            .map(|photo_id| format!("/photos/{photo_id}/thumbnail"));
+
+        GrowLogSummary {
+            id: self.id,
+            plant_id: self.plant_id,
+            name: self.name,
+            started_at: self.started_at,
+            description: self.description,
+            ended_at: self.ended_at,
+            outcome: self.outcome,
+            thumbnail_url,
+            inserted_at: self.inserted_at,
+            updated_at: self.updated_at,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -58,6 +93,7 @@ pub struct Photo {
     pub media_type: String,
     pub original_filename: Option<String>,
     pub url: String,
+    pub thumbnail_url: String,
     pub inserted_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -80,7 +116,6 @@ pub struct PlantDetail {
 pub struct GrowLogDetail {
     #[serde(flatten)]
     pub grow_log: GrowLog,
-    pub plant_name: String,
     pub entries: Vec<EntryWithPhotos>,
 }
 
@@ -163,12 +198,11 @@ pub async fn list_plant_logs(
     user_id: i64,
     plant_id: i64,
 ) -> Result<Vec<GrowLogSummary>, AppError> {
-    Ok(sqlx::query_as::<_, GrowLogSummary>(
+    let log_summaries = sqlx::query_as::<_, GrowLogSummaryRow>(
         "SELECT log.id, log.plant_id, log.name, log.started_at, log.description,
-                log.ended_at, log.outcome, plant.name AS plant_name,
-                newest_photo.id AS newest_entry_photo_id, log.inserted_at, log.updated_at
+                log.ended_at, log.outcome, newest_photo.id AS thumbnail_photo_id,
+                log.inserted_at, log.updated_at
          FROM grow_logs log
-         JOIN plants plant ON plant.id = log.plant_id AND plant.user_id = log.user_id
          LEFT JOIN LATERAL (
              SELECT photo.id
              FROM grow_log_entries entry
@@ -190,16 +224,19 @@ pub async fn list_plant_logs(
     .bind(user_id)
     .bind(plant_id)
     .fetch_all(pool)
-    .await?)
+    .await?;
+    Ok(log_summaries
+        .into_iter()
+        .map(GrowLogSummaryRow::into_grow_log_summary)
+        .collect())
 }
 
 pub async fn list_user_logs(pool: &PgPool, user_id: i64) -> Result<Vec<GrowLogSummary>, AppError> {
-    Ok(sqlx::query_as::<_, GrowLogSummary>(
+    let log_summaries = sqlx::query_as::<_, GrowLogSummaryRow>(
         "SELECT log.id, log.plant_id, log.name, log.started_at, log.description,
-                log.ended_at, log.outcome, plant.name AS plant_name,
-                newest_photo.id AS newest_entry_photo_id, log.inserted_at, log.updated_at
+                log.ended_at, log.outcome, newest_photo.id AS thumbnail_photo_id,
+                log.inserted_at, log.updated_at
          FROM grow_logs log
-         JOIN plants plant ON plant.id = log.plant_id AND plant.user_id = log.user_id
          LEFT JOIN LATERAL (
              SELECT photo.id
              FROM grow_log_entries entry
@@ -220,7 +257,11 @@ pub async fn list_user_logs(pool: &PgPool, user_id: i64) -> Result<Vec<GrowLogSu
     )
     .bind(user_id)
     .fetch_all(pool)
-    .await?)
+    .await?;
+    Ok(log_summaries
+        .into_iter()
+        .map(GrowLogSummaryRow::into_grow_log_summary)
+        .collect())
 }
 
 pub async fn list_entries(pool: &PgPool, log_id: i64) -> Result<Vec<EntryWithPhotos>, AppError> {
@@ -265,11 +306,13 @@ struct PhotoRow {
 impl PhotoRow {
     fn into_photo(self) -> Photo {
         let url = format!("/photos/{}", self.id);
+        let thumbnail_url = format!("/photos/{}/thumbnail", self.id);
         Photo {
             id: self.id,
             media_type: self.media_type,
             original_filename: self.original_filename,
             url,
+            thumbnail_url,
             inserted_at: self.inserted_at,
             updated_at: self.updated_at,
         }
@@ -282,19 +325,8 @@ pub async fn find_log_detail(
     log_id: i64,
 ) -> Result<GrowLogDetail, AppError> {
     let grow_log = find_log(pool, user_id, log_id).await?;
-    let plant_name =
-        sqlx::query_scalar::<_, String>("SELECT name FROM plants WHERE id = $1 AND user_id = $2")
-            .bind(grow_log.plant_id)
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await?
-            .ok_or(AppError::NotFound)?;
     let entries = list_entries(pool, log_id).await?;
-    Ok(GrowLogDetail {
-        grow_log,
-        plant_name,
-        entries,
-    })
+    Ok(GrowLogDetail { grow_log, entries })
 }
 
 pub async fn list_log_photo_storage_keys(
@@ -338,14 +370,21 @@ pub async fn remove_photo_files(
     storage_keys: Vec<String>,
 ) -> Result<(), AppError> {
     for storage_key in storage_keys {
-        let photo_path = photo_storage_directory.join(storage_key);
-        match tokio::fs::remove_file(photo_path).await {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(AppError::Application(error.to_string())),
+        let thumbnail_storage_key = derive_photo_thumbnail_storage_key(&storage_key);
+        for photo_storage_key in [storage_key, thumbnail_storage_key] {
+            let photo_path = photo_storage_directory.join(photo_storage_key);
+            match tokio::fs::remove_file(photo_path).await {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(AppError::Application(error.to_string())),
+            }
         }
     }
     Ok(())
+}
+
+pub fn derive_photo_thumbnail_storage_key(storage_key: &str) -> String {
+    format!("{storage_key}.thumbnail.jpg")
 }
 
 pub fn validate_nonempty_field(field_name: &str, value: &str) -> Result<(), AppError> {

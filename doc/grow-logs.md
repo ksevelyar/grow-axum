@@ -55,7 +55,7 @@ All endpoints require an authenticated session.
 * `PATCH /logs/{log_id}` updates one owned grow log.
 * `DELETE /logs/{log_id}` deletes one owned grow log.
 
-The log list includes the most recent entry photo when one exists. The client uses it as the gallery thumbnail.
+Each log summary includes an optional `thumbnail_url` for its most recent entry photo.
 
 ### Entries
 * `POST /logs/{log_id}/entries` creates an entry for an owned grow log.
@@ -63,9 +63,11 @@ The log list includes the most recent entry photo when one exists. The client us
 * `DELETE /entries/{entry_id}` deletes one owned entry and its photos.
 
 ### Entry photos
-* `POST /entries/{entry_id}/photos` uploads one photo using `multipart/form-data`.
-* `GET /photos/{photo_id}` returns one owned photo.
-* `DELETE /photos/{photo_id}` deletes one owned photo.
+* `POST /entries/{entry_id}/photos` uploads one image using `multipart/form-data`, up to 10 MiB, and creates a JPEG thumbnail up to 1024-by-1024 pixels at 90% quality.
+* `GET /photos/{photo_id}` returns the original photo.
+* `GET /photos/{photo_id}/thumbnail` returns its thumbnail.
+* Log index responses include the newest entry photo thumbnail URL. Log detail responses include original and thumbnail URLs for each photo.
+* `DELETE /photos/{photo_id}` deletes the original photo and its thumbnail.
 
 ## Errors
 * Missing or invalid sessions return `401 Unauthorized`.

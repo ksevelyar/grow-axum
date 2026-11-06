@@ -10,6 +10,7 @@ bcrypt = "0.19.1"
 cookie = "0.18.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 chrono-tz = "0.10.4"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

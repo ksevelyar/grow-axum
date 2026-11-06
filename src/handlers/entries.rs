@@ -153,6 +153,7 @@ impl PhotoRow {
             media_type: self.media_type,
             original_filename: self.original_filename,
             url: format!("/photos/{}", self.id),
+            thumbnail_url: format!("/photos/{}/thumbnail", self.id),
             inserted_at: self.inserted_at,
             updated_at: self.updated_at,
         }

@@ -4,12 +4,15 @@ use axum::extract::{Multipart, Path, State};
 use axum::http::{HeaderValue, Response, StatusCode, header};
 use axum_extra::extract::cookie::CookieJar;
 use chrono::{DateTime, Utc};
+use image::codecs::jpeg::JpegEncoder;
+use image::{DynamicImage, ImageDecoder, ImageReader};
+use std::io::Cursor;
 use std::sync::Arc;
 
 use crate::AppState;
 use crate::authentication::authenticate_cookie;
 use crate::error::{AppError, FieldError};
-use crate::grow_logs::{Photo, find_photo, remove_photo_files};
+use crate::grow_logs::{Photo, derive_photo_thumbnail_storage_key, find_photo, remove_photo_files};
 
 pub async fn create(
     State(state): State<Arc<AppState>>,
@@ -41,15 +44,26 @@ pub async fn create(
     {
         return Err(invalid_photo_upload());
     }
+    let thumbnail_source_bytes = file_bytes.clone();
+    let thumbnail_bytes =
+        tokio::task::spawn_blocking(move || create_photo_thumbnail(&thumbnail_source_bytes))
+            .await
+            .map_err(|error| AppError::Application(error.to_string()))??;
 
     tokio::fs::create_dir_all(&state.photo_storage_directory)
         .await
         .map_err(|error| AppError::Application(error.to_string()))?;
     let storage_key = uuid::Uuid::new_v4().to_string();
+    let thumbnail_storage_key = derive_photo_thumbnail_storage_key(&storage_key);
     let storage_path = state.photo_storage_directory.join(&storage_key);
+    let thumbnail_storage_path = state.photo_storage_directory.join(&thumbnail_storage_key);
     tokio::fs::write(&storage_path, file_bytes)
         .await
         .map_err(|error| AppError::Application(error.to_string()))?;
+    if let Err(error) = tokio::fs::write(&thumbnail_storage_path, thumbnail_bytes).await {
+        let _ = tokio::fs::remove_file(storage_path).await;
+        return Err(AppError::Application(error.to_string()));
+    }
 
     let inserted_photo = sqlx::query_as::<_, PhotoRow>(
         "INSERT INTO grow_log_entry_photos
@@ -67,6 +81,7 @@ pub async fn create(
         Ok(photo) => photo,
         Err(database_error) => {
             let _ = tokio::fs::remove_file(storage_path).await;
+            let _ = tokio::fs::remove_file(thumbnail_storage_path).await;
             return Err(database_error.into());
         }
     };
@@ -88,14 +103,26 @@ pub async fn show(
             AppError::Application(error.to_string())
         }
     })?;
-    let media_type = HeaderValue::from_str(&photo.media_type)
-        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, media_type)
-        .header(header::CACHE_CONTROL, "private, no-store")
-        .body(Body::from(photo_bytes))
-        .map_err(|error| AppError::Application(error.to_string()))
+    create_photo_response(photo_bytes, &photo.media_type)
+}
+
+pub async fn show_thumbnail(
+    State(state): State<Arc<AppState>>,
+    cookie_jar: CookieJar,
+    Path(photo_id): Path<i64>,
+) -> Result<Response<Body>, AppError> {
+    let authenticated_user = authenticate_cookie(&state.pool, &cookie_jar).await?;
+    let photo = find_photo(&state.pool, authenticated_user.id, photo_id).await?;
+    let thumbnail_storage_key = derive_photo_thumbnail_storage_key(&photo.storage_key);
+    let thumbnail_path = state.photo_storage_directory.join(thumbnail_storage_key);
+    let thumbnail_bytes = tokio::fs::read(thumbnail_path).await.map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            AppError::NotFound
+        } else {
+            AppError::Application(error.to_string())
+        }
+    })?;
+    create_photo_response(thumbnail_bytes, "image/jpeg")
 }
 
 pub async fn delete(
@@ -113,10 +140,56 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+fn create_photo_thumbnail(file_bytes: &[u8]) -> Result<Vec<u8>, AppError> {
+    let image_reader = ImageReader::new(Cursor::new(file_bytes))
+        .with_guessed_format()
+        .map_err(|_| invalid_photo_image())?;
+    let mut image_decoder = image_reader
+        .into_decoder()
+        .map_err(|_| invalid_photo_image())?;
+    let image_orientation = image_decoder
+        .orientation()
+        .map_err(|_| invalid_photo_image())?;
+    let mut original_image =
+        DynamicImage::from_decoder(image_decoder).map_err(|_| invalid_photo_image())?;
+    original_image.apply_orientation(image_orientation);
+    let thumbnail_maximum_width = 1024;
+    let thumbnail_maximum_height = 1024;
+    let thumbnail_jpeg_quality = 90;
+    let thumbnail_image =
+        original_image.thumbnail(thumbnail_maximum_width, thumbnail_maximum_height);
+    let mut thumbnail_bytes = Vec::new();
+    JpegEncoder::new_with_quality(&mut thumbnail_bytes, thumbnail_jpeg_quality)
+        .encode_image(&thumbnail_image)
+        .map_err(|error| AppError::Application(error.to_string()))?;
+    Ok(thumbnail_bytes)
+}
+
+fn create_photo_response(
+    photo_bytes: Vec<u8>,
+    media_type: &str,
+) -> Result<Response<Body>, AppError> {
+    let media_type = HeaderValue::from_str(media_type)
+        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, media_type)
+        .header(header::CACHE_CONTROL, "private, no-store")
+        .body(Body::from(photo_bytes))
+        .map_err(|error| AppError::Application(error.to_string()))
+}
+
 fn invalid_photo_upload() -> AppError {
     AppError::Validation(vec![FieldError {
         field: "file".to_owned(),
         message: "one file is required per upload".to_owned(),
+    }])
+}
+
+fn invalid_photo_image() -> AppError {
+    AppError::Validation(vec![FieldError {
+        field: "file".to_owned(),
+        message: "must be a valid JPEG or PNG image".to_owned(),
     }])
 }
 
@@ -136,6 +209,7 @@ impl PhotoRow {
             media_type: self.media_type,
             original_filename: self.original_filename,
             url: format!("/photos/{}", self.id),
+            thumbnail_url: format!("/photos/{}/thumbnail", self.id),
             inserted_at: self.inserted_at,
             updated_at: self.updated_at,
         }

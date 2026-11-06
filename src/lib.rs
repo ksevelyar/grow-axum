@@ -87,6 +87,10 @@ pub fn build_app_with_photo_storage_directory(
                 .layer(DefaultBodyLimit::max(photo_upload_maximum_request_size)),
         )
         .route(
+            "/photos/{photo_id}/thumbnail",
+            get(handlers::photos::show_thumbnail),
+        )
+        .route(
             "/photos/{photo_id}",
             get(handlers::photos::show).delete(handlers::photos::delete),
         )
