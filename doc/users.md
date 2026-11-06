@@ -1,8 +1,18 @@
 # Users
-## Registration
-`POST /users` creates an account.
+## Requirements
+* `POST /users` creates an account without an authenticated session.
+* `email`, `handle`, `password`, and `timezone` are required.
+* Email addresses and handles are unique. Email uniqueness is case-insensitive.
+* `timezone` must be an IANA timezone name.
+* Responses never include the password or its hash.
 
-Request body:
+## User scenarios
+### 1. Register an account
+Request:
+```http
+POST /users
+```
+
 ```json
 {
   "email": "person@example.com",
@@ -12,7 +22,7 @@ Request body:
 }
 ```
 
-`timezone` must be an IANA timezone name. A successful request returns `201 Created`:
+Response, `201 Created`:
 ```json
 {
   "id": 1,
@@ -21,22 +31,58 @@ Request body:
 }
 ```
 
-An already registered email or invalid timezone returns `422 Unprocessable Entity` with field errors.
+### 2. Reject an email already in use
+Request:
+```http
+POST /users
+```
 
-## Sessions
-`POST /sessions` authenticates an email and password.
-
-Request body:
 ```json
 {
-  "email": "person@example.com",
-  "password": "correct horse battery staple"
+  "email": "PERSON@example.com",
+  "handle": "another-person",
+  "password": "correct horse battery staple",
+  "timezone": "Europe/London"
 }
 ```
 
-A successful request returns `201 Created` and sets a `jwt` cookie. The cookie is HTTP-only, scoped to `/`, lasts one year, and is secure outside debug builds. Invalid credentials return `401 Unauthorized`.
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "email",
+      "message": "email is already taken"
+    }
+  ]
+}
+```
 
-`GET /sessions/current` returns the authenticated user. It requires the `jwt` cookie and returns `401 Unauthorized` when the cookie is missing, invalid, expired, or belongs to a deleted user.
+### 3. Reject an unknown timezone
+Request:
+```http
+POST /users
+```
 
-## Configuration
-`JWT_SECRET` signs and verifies session tokens. It must be set before session endpoints are used.
+```json
+{
+  "email": "person@example.com",
+  "handle": "person",
+  "password": "correct horse battery staple",
+  "timezone": "Mars/Olympus_Mons"
+}
+```
+
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "timezone",
+      "message": "unknown timezone"
+    }
+  ]
+}
+```

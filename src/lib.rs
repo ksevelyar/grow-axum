@@ -20,9 +20,9 @@ pub struct AppState {
 }
 
 pub fn build_app(pool: PgPool) -> Router {
-    let photo_storage_directory = std::env::var_os("PHOTO_STORAGE_DIRECTORY")
+    let photo_storage_directory = std::env::var_os("STORAGE_DIRECTORY")
         .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("grow-axum-photos"));
+        .expect("STORAGE_DIRECTORY must be set");
     build_app_with_photo_storage_directory(pool, photo_storage_directory)
 }
 

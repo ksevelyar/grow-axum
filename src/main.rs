@@ -5,9 +5,9 @@ use std::path::PathBuf;
 #[tokio::main]
 async fn main() {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let photo_storage_directory = std::env::var_os("PHOTO_STORAGE_DIRECTORY")
+    let photo_storage_directory = std::env::var_os("STORAGE_DIRECTORY")
         .map(PathBuf::from)
-        .expect("PHOTO_STORAGE_DIRECTORY must be set");
+        .expect("STORAGE_DIRECTORY must be set");
     tokio::fs::create_dir_all(&photo_storage_directory)
         .await
         .expect("failed to create photo storage directory");

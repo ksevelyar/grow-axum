@@ -1,76 +1,142 @@
 # Grow logs
-## Scope
-Authenticated users manage their own plants, grow logs, log entries, and entry photos. A user cannot read or modify another user's resources.
+## Requirements
+* All endpoints require an authenticated session.
+* Plants belong to one user. Names are required, trimmed, and unique per user.
+* A plant detail includes its logs. Plant and log indexes are ordered newest first by their respective timestamps.
+* A grow log belongs to one owned plant. Its name and `started_at` are required.
+* `started_at` and `ended_at` are RFC 3339 timestamps. An end cannot precede its start.
+* Logs include optional `description`, `ended_at`, and `outcome`. A missing end means the log is active.
+* Deleting a plant referenced by a log returns `409 Conflict`.
+* Resources belonging to another user return `404 Not Found`.
+* Deleting a log also deletes its entries and photos.
 
-## Plants
-A plant belongs to one user and has an id and name.
+## User scenarios
+### 1. Create a plant
+Request:
+```http
+POST /plants
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
 
-* A plant name is required and unique within its owner's plants.
-* Users can create, list, update, and delete their plants.
-* Viewing a plant shows all grow logs for that plant.
-* Deleting a plant that is referenced by one or more grow logs returns `409 Conflict`.
+```json
+{
+  "name": "Tomato"
+}
+```
 
-## Grow logs
-A grow log belongs to one user and references exactly one of that user's plants.
+Response, `201 Created`:
+```json
+{
+  "id": 1,
+  "name": "Tomato",
+  "inserted_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z"
+}
+```
 
-* A grow log has an id, plant id, required name, required UTC start timestamp, optional description, optional UTC end timestamp, and optional text outcome.
-* A user can create, list, view, update, and delete their grow logs.
-* The selected plant must belong to the authenticated user.
-* An end timestamp cannot be earlier than the start timestamp.
-* A log without an end timestamp is active. A log with an end timestamp is completed.
-* Bloom light scheduling is not part of this version.
+### 2. Create a grow log
+Request:
+```http
+POST /logs
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
 
-## Log entries
-A log entry belongs to one grow log.
+```json
+{
+  "plant_id": 1,
+  "name": "Spring grow",
+  "started_at": "2024-03-01T09:00:00Z",
+  "description": "Started indoors",
+  "ended_at": null,
+  "outcome": null
+}
+```
 
-* An entry has an id, required UTC date timestamp, required stage, optional description, and zero or more photos.
-* Valid stages are `germination`, `seedling`, `vegetation`, and `bloom`.
-* A user can create, update, and delete entries for their grow logs.
-* A user cannot access entries through a grow log owned by another user.
-* Entries are displayed newest first.
-* Entry photos are optional.
+Response, `201 Created`:
+```json
+{
+  "id": 1,
+  "plant_id": 1,
+  "name": "Spring grow",
+  "started_at": "2024-03-01T09:00:00Z",
+  "description": "Started indoors",
+  "ended_at": null,
+  "outcome": null,
+  "inserted_at": "2024-03-01T09:00:00Z",
+  "updated_at": "2024-03-01T09:00:00Z",
+  "entries": []
+}
+```
 
-## Photos
-Photos belong to one log entry and are stored on the server filesystem.
+### 3. List grow logs
+Request:
+```http
+GET /logs
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
 
-* A user can upload multiple photos for an entry.
-* The server generates photo identifiers and storage names. It must not use a client-provided filename as a storage path.
-* The server serves photos only to the owner of the containing grow log.
-* Deleting an entry deletes its photo files. Deleting a grow log deletes its entries and their photo files.
+Response, `200 OK`:
+```json
+[
+  {
+    "id": 1,
+    "plant_id": 1,
+    "name": "Spring grow",
+    "started_at": "2024-03-01T09:00:00Z",
+    "description": "Started indoors",
+    "ended_at": null,
+    "outcome": null,
+    "thumbnail_url": "/photos/4/thumbnail",
+    "inserted_at": "2024-03-01T09:00:00Z",
+    "updated_at": "2024-03-01T09:00:00Z"
+  }
+]
+```
 
-## API
-All endpoints require an authenticated session.
+### 4. Complete a grow log
+Request:
+```http
+PATCH /logs/1
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
 
-### Plants
-* `GET /plants` lists the authenticated user's plants.
-* `POST /plants` creates a plant.
-* `GET /plants/{plant_id}` returns one owned plant and its grow logs.
-* `PATCH /plants/{plant_id}` updates one owned plant.
-* `DELETE /plants/{plant_id}` deletes one owned unreferenced plant.
+```json
+{
+  "plant_id": 1,
+  "name": "Spring grow",
+  "started_at": "2024-03-01T09:00:00Z",
+  "description": "Started indoors",
+  "ended_at": "2024-07-01T12:00:00Z",
+  "outcome": "Harvested"
+}
+```
 
-### Logs
-* `GET /logs` lists the authenticated user's active and completed logs.
-* `POST /logs` creates a grow log.
-* `GET /logs/{log_id}` returns one owned grow log and all its entries, ordered newest first.
-* `PATCH /logs/{log_id}` updates one owned grow log.
-* `DELETE /logs/{log_id}` deletes one owned grow log.
+Response, `200 OK`:
+```json
+{
+  "id": 1,
+  "plant_id": 1,
+  "name": "Spring grow",
+  "started_at": "2024-03-01T09:00:00Z",
+  "description": "Started indoors",
+  "ended_at": "2024-07-01T12:00:00Z",
+  "outcome": "Harvested",
+  "inserted_at": "2024-03-01T09:00:00Z",
+  "updated_at": "2024-07-01T12:00:00Z",
+  "entries": []
+}
+```
 
-Each log summary includes an optional `thumbnail_url` for its most recent entry photo.
+### 5. Reject deletion of a referenced plant
+Request:
+```http
+DELETE /plants/1
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
 
-### Entries
-* `POST /logs/{log_id}/entries` creates an entry for an owned grow log.
-* `PATCH /entries/{entry_id}` updates one owned entry.
-* `DELETE /entries/{entry_id}` deletes one owned entry and its photos.
-
-### Entry photos
-* `POST /entries/{entry_id}/photos` uploads one image using `multipart/form-data`, up to 10 MiB, and creates a JPEG thumbnail up to 1024-by-1024 pixels at 90% quality.
-* `GET /photos/{photo_id}` returns the original photo.
-* `GET /photos/{photo_id}/thumbnail` returns its thumbnail.
-* Log index responses include the newest entry photo thumbnail URL. Log detail responses include original and thumbnail URLs for each photo.
-* `DELETE /photos/{photo_id}` deletes the original photo and its thumbnail.
-
-## Errors
-* Missing or invalid sessions return `401 Unauthorized`.
-* A resource outside the authenticated user's ownership returns `404 Not Found`.
-* Invalid request fields return `422 Unprocessable Entity` with field errors.
-* Deleting a referenced plant returns `409 Conflict`.
+Response, `409 Conflict`:
+```json
+{
+  "error": "conflict"
+}
+```

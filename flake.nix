@@ -58,7 +58,7 @@
               '')
             ];
             DATABASE_URL = "postgres://postgres:postgres@localhost:5432/grow_axum";
-            PHOTO_STORAGE_DIRECTORY = "/tmp/grow-axum-photos";
+            STORAGE_DIRECTORY = "storage";
             CORS_ORIGINS = "http://grow.localhost:3001,http://localhost:3001";
             RUST_LOG = "info";
             JWT_SECRET = "very secret";
