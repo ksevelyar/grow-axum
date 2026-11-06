@@ -13,6 +13,8 @@ pub struct FieldError {
 #[derive(Debug)]
 pub enum AppError {
     Unauthorized,
+    NotFound,
+    Conflict,
     Validation(Vec<FieldError>),
     Application(String),
     Configuration(String),
@@ -28,6 +30,8 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unauthorized => write!(formatter, "unauthorized"),
+            Self::NotFound => write!(formatter, "not found"),
+            Self::Conflict => write!(formatter, "conflict"),
             Self::Validation(field_errors) => {
                 write!(formatter, "validation failed: {field_errors:?}")
             }
@@ -41,6 +45,8 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status_code, response_body) = match self {
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, json!({"error": "unauthorized"})),
+            Self::NotFound => (StatusCode::NOT_FOUND, json!({"error": "not found"})),
+            Self::Conflict => (StatusCode::CONFLICT, json!({"error": "conflict"})),
             Self::Validation(field_errors) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 json!({"error": "validation failed", "fields": field_errors}),
