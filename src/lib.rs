@@ -5,6 +5,7 @@ pub mod handlers;
 pub mod users;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method, header};
 use axum::routing::{get, patch, post};
 use sqlx::PgPool;
@@ -33,6 +34,7 @@ pub fn build_app_with_photo_storage_directory(
         pool,
         photo_storage_directory,
     });
+    let photo_upload_maximum_request_size = 10 * 1024 * 1024;
     let allowed_origins = std::env::var("CORS_ORIGINS")
         .unwrap_or_else(|_| "http://grow.localhost:3001,http://localhost:3001".to_owned())
         .split(',')
@@ -79,7 +81,11 @@ pub fn build_app_with_photo_storage_directory(
             "/entries/{entry_id}",
             patch(handlers::entries::update).delete(handlers::entries::delete),
         )
-        .route("/entries/{entry_id}/photos", post(handlers::photos::create))
+        .route(
+            "/entries/{entry_id}/photos",
+            post(handlers::photos::create)
+                .layer(DefaultBodyLimit::max(photo_upload_maximum_request_size)),
+        )
         .route(
             "/photos/{photo_id}",
             get(handlers::photos::show).delete(handlers::photos::delete),

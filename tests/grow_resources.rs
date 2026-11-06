@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use std::path::PathBuf;
 use tower::ServiceExt;
 
+const PHOTO_FIXTURE_BYTES: &[u8] = include_bytes!("fixtures/IMG_20261106_174117.jpg");
+
 async fn read_json_body(response: Response<Body>) -> Value {
     let response_body = response.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&response_body).unwrap()
@@ -136,17 +138,21 @@ async fn create_photo(
     entry_id: i64,
     file_bytes: &[u8],
 ) -> Response<Body> {
-    let boundary = "grow-photo-boundary";
+    let multipart_boundary = "grow-photo-boundary";
+    let multipart_headers = format!(
+        "--{multipart_boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"client-name.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
+    );
+    let mut multipart_body = multipart_headers.into_bytes();
+    multipart_body.extend_from_slice(file_bytes);
+    let multipart_closing_boundary = format!("\r\n--{multipart_boundary}--\r\n");
+    multipart_body.extend_from_slice(multipart_closing_boundary.as_bytes());
     let request = Request::post(format!("/entries/{entry_id}/photos"))
         .header(header::COOKIE, session_cookie)
         .header(
             header::CONTENT_TYPE,
-            format!("multipart/form-data; boundary={boundary}"),
+            format!("multipart/form-data; boundary={multipart_boundary}"),
         )
-        .body(Body::from(format!(
-            "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"client-name.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n{}\r\n--{boundary}--\r\n",
-            String::from_utf8_lossy(file_bytes)
-        )))
+        .body(Body::from(multipart_body))
         .unwrap();
     application.clone().oneshot(request).await.unwrap()
 }
@@ -424,8 +430,13 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
         "stage"
     );
     let newest_entry_id = *entry_ids.last().unwrap();
-    let uploaded_photo_response =
-        create_photo(&application, &owner_cookie, newest_entry_id, b"photo bytes").await;
+    let uploaded_photo_response = create_photo(
+        &application,
+        &owner_cookie,
+        newest_entry_id,
+        PHOTO_FIXTURE_BYTES,
+    )
+    .await;
     assert_eq!(uploaded_photo_response.status(), StatusCode::CREATED);
     let uploaded_photo = read_json_body(uploaded_photo_response).await;
     let photo_id = uploaded_photo["id"].as_i64().unwrap();
@@ -500,7 +511,7 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
             .await
             .unwrap()
             .to_bytes(),
-        "photo bytes"
+        PHOTO_FIXTURE_BYTES
     );
 
     let valid_log_update_response = send_json_request(
@@ -607,13 +618,18 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
         &application,
         &owner_cookie,
         foreign_entry_id,
-        b"not allowed",
+        PHOTO_FIXTURE_BYTES,
     )
     .await;
     assert_eq!(foreign_entry_photo_upload.status(), StatusCode::NOT_FOUND);
 
-    let photo_response =
-        create_photo(&application, &owner_cookie, owner_entry_id, b"first photo").await;
+    let photo_response = create_photo(
+        &application,
+        &owner_cookie,
+        owner_entry_id,
+        PHOTO_FIXTURE_BYTES,
+    )
+    .await;
     assert_eq!(photo_response.status(), StatusCode::CREATED);
     let photo = read_json_body(photo_response).await;
     assert_eq!(photo["original_filename"], "client-name.jpg");
@@ -652,7 +668,7 @@ async fn photo_and_entry_deletion_remove_files_and_reject_foreign_users(pool: Pg
         &application,
         &owner_cookie,
         owner_entry_id,
-        b"entry deletion photo",
+        PHOTO_FIXTURE_BYTES,
     )
     .await;
     let entry_photo = read_json_body(entry_photo_response).await;
