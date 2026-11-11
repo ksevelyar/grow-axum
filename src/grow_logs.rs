@@ -208,14 +208,7 @@ pub async fn list_plant_logs(
              FROM grow_log_entries entry
              JOIN grow_log_entry_photos photo ON photo.grow_log_entry_id = entry.id
              WHERE entry.grow_log_id = log.id
-               AND entry.id = (
-                   SELECT newest_entry.id
-                   FROM grow_log_entries newest_entry
-                   WHERE newest_entry.grow_log_id = log.id
-                   ORDER BY newest_entry.occurred_at DESC, newest_entry.id DESC
-                   LIMIT 1
-               )
-             ORDER BY photo.id
+             ORDER BY entry.occurred_at DESC, entry.id DESC, photo.id DESC
              LIMIT 1
          ) newest_photo ON TRUE
          WHERE log.user_id = $1 AND log.plant_id = $2
@@ -242,14 +235,7 @@ pub async fn list_user_logs(pool: &PgPool, user_id: i64) -> Result<Vec<GrowLogSu
              FROM grow_log_entries entry
              JOIN grow_log_entry_photos photo ON photo.grow_log_entry_id = entry.id
              WHERE entry.grow_log_id = log.id
-               AND entry.id = (
-                   SELECT newest_entry.id
-                   FROM grow_log_entries newest_entry
-                   WHERE newest_entry.grow_log_id = log.id
-                   ORDER BY newest_entry.occurred_at DESC, newest_entry.id DESC
-                   LIMIT 1
-               )
-             ORDER BY photo.id
+             ORDER BY entry.occurred_at DESC, entry.id DESC, photo.id DESC
              LIMIT 1
          ) newest_photo ON TRUE
          WHERE log.user_id = $1

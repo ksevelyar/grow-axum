@@ -429,11 +429,11 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
         read_json_body(invalid_stage_response).await["fields"][0]["field"],
         "stage"
     );
-    let newest_entry_id = *entry_ids.last().unwrap();
+    let entry_with_photo_id = entry_ids[2];
     let uploaded_photo_response = create_photo(
         &application,
         &owner_cookie,
-        newest_entry_id,
+        entry_with_photo_id,
         PHOTO_FIXTURE_BYTES,
     )
     .await;
@@ -466,6 +466,19 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
         gallery_logs[0]["thumbnail_url"],
         format!("/photos/{photo_id}/thumbnail")
     );
+    let plant_detail_response = send_json_request(
+        &application,
+        Method::GET,
+        &format!("/plants/{owner_plant_id}"),
+        Value::Null,
+        Some(&owner_cookie),
+    )
+    .await;
+    let plant_detail = read_json_body(plant_detail_response).await;
+    assert_eq!(
+        plant_detail["grow_logs"][0]["thumbnail_url"],
+        format!("/photos/{photo_id}/thumbnail")
+    );
     let log_detail_response = send_json_request(
         &application,
         Method::GET,
@@ -485,13 +498,13 @@ async fn logs_validate_ownership_dates_stages_and_return_gallery_and_detail_data
         entry_stages,
         ["bloom", "vegetation", "seedling", "germination"]
     );
-    assert_eq!(log_detail["entries"][0]["photos"][0]["id"], photo_id);
+    assert_eq!(log_detail["entries"][1]["photos"][0]["id"], photo_id);
     assert_eq!(
-        log_detail["entries"][0]["photos"][0]["url"],
+        log_detail["entries"][1]["photos"][0]["url"],
         format!("/photos/{photo_id}")
     );
     assert_eq!(
-        log_detail["entries"][0]["photos"][0]["thumbnail_url"],
+        log_detail["entries"][1]["photos"][0]["thumbnail_url"],
         format!("/photos/{photo_id}/thumbnail")
     );
 

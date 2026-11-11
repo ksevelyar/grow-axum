@@ -6,6 +6,7 @@
 * A grow log belongs to one owned plant. Its name and `started_at` are required.
 * `started_at` and `ended_at` are RFC 3339 timestamps. An end cannot precede its start.
 * Logs include optional `description`, `ended_at`, and `outcome`. A missing end means the log is active.
+* A log summary's thumbnail points to the newest photo across its entries, skipping entries without photos.
 * Deleting a plant referenced by a log returns `409 Conflict`.
 * Resources belonging to another user return `404 Not Found`.
 * Deleting a log also deletes its entries and photos.
