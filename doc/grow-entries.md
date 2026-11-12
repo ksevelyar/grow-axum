@@ -10,7 +10,7 @@
 * Deleting an entry or log deletes its photo records, originals, and thumbnails.
 
 ## User scenarios
-### 1. Add an entry to a grow log
+### 1. User adds an entry to a grow log
 Request:
 ```http
 POST /logs/1/entries
@@ -39,7 +39,7 @@ Response, `201 Created`:
 }
 ```
 
-### 2. Upload a photo
+### 2. User uploads a photo
 Multipart request:
 ```http
 POST /entries/2/photos
@@ -67,7 +67,7 @@ Response, `201 Created`:
 }
 ```
 
-### 3. Update an entry
+### 3. User updates an entry
 Request:
 ```http
 PATCH /entries/2
@@ -106,7 +106,7 @@ Response, `200 OK`:
 }
 ```
 
-### 4. Reject an invalid stage
+### 4. User cannot use an invalid stage
 Request:
 ```http
 POST /logs/1/entries
@@ -133,7 +133,7 @@ Response, `422 Unprocessable Entity`:
 }
 ```
 
-### 5. Reject access to another user's photo
+### 5. User cannot access another user's photo
 Request:
 ```http
 GET /photos/4

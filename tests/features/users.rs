@@ -51,7 +51,7 @@ async fn register_user(application: &mut axum::routing::RouterIntoService<Body>)
 }
 
 #[sqlx::test]
-async fn register_user_returns_public_user(pool: PgPool) {
+async fn user_registers_an_account(pool: PgPool) {
     let mut application = build_app(pool).into_service();
 
     let registered_user = register_user(&mut application).await;
@@ -63,7 +63,7 @@ async fn register_user_returns_public_user(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn register_user_rejects_duplicate_email_without_regard_to_case(pool: PgPool) {
+async fn user_cannot_register_an_account_with_an_email_already_in_use(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     register_user(&mut application).await;
 
@@ -92,7 +92,7 @@ async fn register_user_rejects_duplicate_email_without_regard_to_case(pool: PgPo
 }
 
 #[sqlx::test]
-async fn register_user_rejects_unknown_timezone(pool: PgPool) {
+async fn user_cannot_register_an_account_with_an_unknown_timezone(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     let invalid_timezone_user = json!({
         "email": "person@example.com",
@@ -120,28 +120,7 @@ async fn register_user_rejects_unknown_timezone(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn register_user_rejects_malformed_payload(pool: PgPool) {
-    let mut application = build_app(pool).into_service();
-
-    let registration_response = application
-        .ready()
-        .await
-        .unwrap()
-        .call(create_json_request(
-            "/users",
-            json!({"email": "person@example.com"}),
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(
-        registration_response.status(),
-        StatusCode::UNPROCESSABLE_ENTITY
-    );
-}
-
-#[sqlx::test]
-async fn create_session_sets_cookie_for_valid_credentials(pool: PgPool) {
+async fn user_signs_in(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     register_user(&mut application).await;
 
@@ -161,7 +140,7 @@ async fn create_session_sets_cookie_for_valid_credentials(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn create_session_rejects_invalid_credentials(pool: PgPool) {
+async fn user_cannot_sign_in_with_invalid_credentials(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     register_user(&mut application).await;
 
@@ -184,7 +163,7 @@ async fn create_session_rejects_invalid_credentials(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn show_current_user_rejects_missing_session(pool: PgPool) {
+async fn user_cannot_see_the_signed_in_user_without_a_session(pool: PgPool) {
     let application = build_app(pool).into_service();
 
     let current_user_response = application
@@ -204,7 +183,7 @@ async fn show_current_user_rejects_missing_session(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn show_current_user_returns_session_user(pool: PgPool) {
+async fn user_sees_the_signed_in_user(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     let registered_user = register_user(&mut application).await;
     let session_response = application

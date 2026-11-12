@@ -4,5 +4,6 @@
 * [Errors](doc/errors.md)
 * [Grow entries](doc/grow-entries.md)
 * [Grow logs](doc/grow-logs.md)
+* [Plants](doc/plants.md)
 * [Sessions](doc/sessions.md)
 * [Users](doc/users.md)

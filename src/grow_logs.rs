@@ -204,6 +204,13 @@ pub async fn list_plant_logs(
                 log.inserted_at, log.updated_at
          FROM grow_logs log
          LEFT JOIN LATERAL (
+             SELECT entry.occurred_at
+             FROM grow_log_entries entry
+             WHERE entry.grow_log_id = log.id
+             ORDER BY entry.occurred_at DESC, entry.id DESC
+             LIMIT 1
+         ) latest_entry ON TRUE
+         LEFT JOIN LATERAL (
              SELECT photo.id
              FROM grow_log_entries entry
              JOIN grow_log_entry_photos photo ON photo.grow_log_entry_id = entry.id
@@ -212,7 +219,7 @@ pub async fn list_plant_logs(
              LIMIT 1
          ) newest_photo ON TRUE
          WHERE log.user_id = $1 AND log.plant_id = $2
-         ORDER BY log.started_at DESC, log.id DESC",
+         ORDER BY latest_entry.occurred_at DESC NULLS LAST, log.id DESC",
     )
     .bind(user_id)
     .bind(plant_id)
@@ -231,6 +238,13 @@ pub async fn list_user_logs(pool: &PgPool, user_id: i64) -> Result<Vec<GrowLogSu
                 log.inserted_at, log.updated_at
          FROM grow_logs log
          LEFT JOIN LATERAL (
+             SELECT entry.occurred_at
+             FROM grow_log_entries entry
+             WHERE entry.grow_log_id = log.id
+             ORDER BY entry.occurred_at DESC, entry.id DESC
+             LIMIT 1
+         ) latest_entry ON TRUE
+         LEFT JOIN LATERAL (
              SELECT photo.id
              FROM grow_log_entries entry
              JOIN grow_log_entry_photos photo ON photo.grow_log_entry_id = entry.id
@@ -239,7 +253,7 @@ pub async fn list_user_logs(pool: &PgPool, user_id: i64) -> Result<Vec<GrowLogSu
              LIMIT 1
          ) newest_photo ON TRUE
          WHERE log.user_id = $1
-         ORDER BY log.started_at DESC, log.id DESC",
+         ORDER BY latest_entry.occurred_at DESC NULLS LAST, log.id DESC",
     )
     .bind(user_id)
     .fetch_all(pool)

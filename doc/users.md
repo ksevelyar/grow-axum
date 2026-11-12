@@ -7,7 +7,7 @@
 * Responses never include the password or its hash.
 
 ## User scenarios
-### 1. Register an account
+### 1. User registers an account
 Request:
 ```http
 POST /users
@@ -31,7 +31,7 @@ Response, `201 Created`:
 }
 ```
 
-### 2. Reject an email already in use
+### 2. User cannot register an account with an email already in use
 Request:
 ```http
 POST /users
@@ -59,7 +59,7 @@ Response, `422 Unprocessable Entity`:
 }
 ```
 
-### 3. Reject an unknown timezone
+### 3. User cannot register an account with an unknown timezone
 Request:
 ```http
 POST /users

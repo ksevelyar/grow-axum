@@ -8,7 +8,7 @@
 * `JWT_SECRET` must be configured to create or verify sessions.
 
 ## User scenarios
-### 1. Sign in
+### 1. User signs in
 Request:
 ```http
 POST /sessions
@@ -33,7 +33,7 @@ Response, `201 Created`:
 }
 ```
 
-### 2. Read the signed-in user
+### 2. User sees the signed-in user
 Request:
 ```http
 GET /sessions/current
@@ -49,7 +49,7 @@ Response, `200 OK`:
 }
 ```
 
-### 3. Reject invalid credentials
+### 3. User cannot sign in with invalid credentials
 Request:
 ```http
 POST /sessions
@@ -69,7 +69,7 @@ Response, `401 Unauthorized`:
 }
 ```
 
-### 4. Reject a missing session
+### 4. User cannot see the signed-in user without a session
 Request:
 ```http
 GET /sessions/current
