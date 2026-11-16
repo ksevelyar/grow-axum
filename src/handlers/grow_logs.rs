@@ -2,7 +2,8 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum_extra::extract::cookie::CookieJar;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -93,9 +94,9 @@ pub async fn update(
     )
     .bind(payload.plant_id)
     .bind(payload.name.trim())
-    .bind(started_at)
+    .bind(started_at.to_sqlx())
     .bind(payload.description)
-    .bind(ended_at)
+    .bind(ended_at.map(|timestamp| timestamp.to_sqlx()))
     .bind(payload.outcome)
     .bind(log_id)
     .bind(authenticated_user.id)
@@ -130,8 +131,8 @@ async fn insert_grow_log(
     pool: &sqlx::PgPool,
     user_id: i64,
     payload: GrowLogPayload,
-    started_at: DateTime<Utc>,
-    ended_at: Option<DateTime<Utc>>,
+    started_at: Timestamp,
+    ended_at: Option<Timestamp>,
 ) -> Result<GrowLog, AppError> {
     Ok(sqlx::query_as::<_, GrowLog>(
         "INSERT INTO grow_logs (user_id, plant_id, name, started_at, description, ended_at, outcome)
@@ -142,9 +143,9 @@ async fn insert_grow_log(
     .bind(user_id)
     .bind(payload.plant_id)
     .bind(payload.name.trim())
-    .bind(started_at)
+    .bind(started_at.to_sqlx())
     .bind(payload.description)
-    .bind(ended_at)
+    .bind(ended_at.map(|timestamp| timestamp.to_sqlx()))
     .bind(payload.outcome)
     .fetch_one(pool)
     .await?)
@@ -153,7 +154,7 @@ async fn insert_grow_log(
 fn parse_optional_timestamp(
     field_name: &str,
     timestamp_value: Option<&str>,
-) -> Result<Option<DateTime<Utc>>, AppError> {
+) -> Result<Option<Timestamp>, AppError> {
     timestamp_value
         .map(|timestamp_text| parse_timestamp(field_name, timestamp_text))
         .transpose()

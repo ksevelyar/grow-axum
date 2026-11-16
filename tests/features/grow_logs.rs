@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 #[sqlx::test]
-async fn user_creates_a_grow_log(pool: PgPool) {
+async fn user_creates_grow_log(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -20,7 +20,7 @@ async fn user_creates_a_grow_log(pool: PgPool) {
         json!({
             "plant_id": plant["id"],
             "name": "Spring grow",
-            "started_at": "2024-03-01T09:00:00Z",
+            "started_at": "2024-03-01T09:00:00.000Z",
             "description": "Started indoors",
             "ended_at": null,
             "outcome": null
@@ -33,6 +33,7 @@ async fn user_creates_a_grow_log(pool: PgPool) {
     let grow_log = read_json_body(response).await;
     assert_eq!(grow_log["plant_id"], plant["id"]);
     assert_eq!(grow_log["name"], "Spring grow");
+    assert_eq!(grow_log["started_at"], "2024-03-01T09:00:00Z");
     assert_eq!(grow_log["entries"], json!([]));
     tokio::fs::remove_dir_all(photo_storage_directory)
         .await
@@ -89,7 +90,7 @@ async fn user_sees_grow_logs_ordered_by_latest_entry(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_completes_a_grow_log(pool: PgPool) {
+async fn user_completes_grow_log(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -122,7 +123,7 @@ async fn user_completes_a_grow_log(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_cannot_use_an_invalid_stage(pool: PgPool) {
+async fn user_cannot_use_invalid_stage(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -154,7 +155,7 @@ async fn user_cannot_use_an_invalid_stage(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_uploads_a_photo(pool: PgPool) {
+async fn user_uploads_photo(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -197,7 +198,7 @@ async fn user_uploads_a_photo(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_can_browse_all_log_photos(pool: PgPool) {
+async fn user_reads_uploaded_photo_and_thumbnail(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;

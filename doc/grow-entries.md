@@ -146,3 +146,34 @@ Response, `404 Not Found`:
   "error": "not found"
 }
 ```
+
+### 6. User reads uploaded photo and thumbnail
+A user retrieves an uploaded JPEG using the photo URLs returned by the upload request.
+
+Request:
+```http
+GET /photos/4
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
+
+Response, `200 OK`:
+```http
+Content-Type: image/jpeg
+Cache-Control: private, no-store
+```
+
+The response body contains the uploaded JPEG bytes.
+
+Request:
+```http
+GET /photos/4/thumbnail
+Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDAsImVtYWlsIjoicGVyc29uQGV4YW1wbGUuY29tIiwiZGV2aWNlX2lkIjpudWxsLCJkZXZpY2VfbmFtZSI6bnVsbH0.K_wZSRP7f6f-fJayUpWmFDbwLbt6e-Af_538M5Ht_U4
+```
+
+Response, `200 OK`:
+```http
+Content-Type: image/jpeg
+Cache-Control: private, no-store
+```
+
+The response body contains a JPEG thumbnail no larger than 1024 by 1024 pixels.

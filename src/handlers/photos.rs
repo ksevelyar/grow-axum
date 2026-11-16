@@ -3,7 +3,6 @@ use axum::body::Body;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{HeaderValue, Response, StatusCode, header};
 use axum_extra::extract::cookie::CookieJar;
-use chrono::{DateTime, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, ImageDecoder, ImageReader};
 use std::io::Cursor;
@@ -198,8 +197,8 @@ struct PhotoRow {
     id: i64,
     media_type: String,
     original_filename: Option<String>,
-    inserted_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    inserted_at: jiff_sqlx::Timestamp,
+    updated_at: jiff_sqlx::Timestamp,
 }
 
 impl PhotoRow {

@@ -1,5 +1,5 @@
 use axum_extra::extract::cookie::{Cookie, CookieJar};
-use chrono::Utc;
+use jiff::Timestamp;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, TokenData, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -21,7 +21,7 @@ fn read_jwt_secret() -> Result<String, AppError> {
 
 pub fn encode_session_token(email: String) -> Result<String, AppError> {
     let jwt_secret = read_jwt_secret()?;
-    let expiry = Utc::now().timestamp() as u64 + SESSION_DURATION_SECONDS;
+    let expiry = Timestamp::now().as_second() as u64 + SESSION_DURATION_SECONDS;
     let claims = Claims { exp: expiry, email };
     encode(
         &Header::default(),

@@ -7,7 +7,7 @@ use serde_json::json;
 use sqlx::PgPool;
 
 #[sqlx::test]
-async fn user_adds_an_entry_to_a_grow_log(pool: PgPool) {
+async fn user_adds_entry_to_grow_log(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -44,7 +44,7 @@ async fn user_adds_an_entry_to_a_grow_log(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_updates_an_entry(pool: PgPool) {
+async fn user_updates_entry(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;

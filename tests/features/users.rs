@@ -51,7 +51,7 @@ async fn register_user(application: &mut axum::routing::RouterIntoService<Body>)
 }
 
 #[sqlx::test]
-async fn user_registers_an_account(pool: PgPool) {
+async fn user_registers_account(pool: PgPool) {
     let mut application = build_app(pool).into_service();
 
     let registered_user = register_user(&mut application).await;
@@ -63,7 +63,7 @@ async fn user_registers_an_account(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_cannot_register_an_account_with_an_email_already_in_use(pool: PgPool) {
+async fn user_cannot_register_account_with_email_already_in_use(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     register_user(&mut application).await;
 
@@ -92,7 +92,7 @@ async fn user_cannot_register_an_account_with_an_email_already_in_use(pool: PgPo
 }
 
 #[sqlx::test]
-async fn user_cannot_register_an_account_with_an_unknown_timezone(pool: PgPool) {
+async fn user_cannot_register_account_with_unknown_timezone(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     let invalid_timezone_user = json!({
         "email": "person@example.com",
@@ -163,7 +163,7 @@ async fn user_cannot_sign_in_with_invalid_credentials(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_cannot_see_the_signed_in_user_without_a_session(pool: PgPool) {
+async fn user_cannot_see_signed_in_user_without_session(pool: PgPool) {
     let application = build_app(pool).into_service();
 
     let current_user_response = application
@@ -183,7 +183,7 @@ async fn user_cannot_see_the_signed_in_user_without_a_session(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_sees_the_signed_in_user(pool: PgPool) {
+async fn user_sees_signed_in_user(pool: PgPool) {
     let mut application = build_app(pool).into_service();
     let registered_user = register_user(&mut application).await;
     let session_response = application
