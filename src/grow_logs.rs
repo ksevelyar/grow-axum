@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::path::Path;
@@ -9,8 +9,8 @@ use crate::error::AppError;
 pub struct Plant {
     pub id: i64,
     pub name: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -18,12 +18,12 @@ pub struct GrowLog {
     pub id: i64,
     pub plant_id: i64,
     pub name: String,
-    pub started_at: DateTime<Utc>,
+    pub started_at: jiff_sqlx::Timestamp,
     pub description: Option<String>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<jiff_sqlx::Timestamp>,
     pub outcome: Option<String>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,13 +31,13 @@ pub struct GrowLogSummary {
     pub id: i64,
     pub plant_id: i64,
     pub name: String,
-    pub started_at: DateTime<Utc>,
+    pub started_at: jiff_sqlx::Timestamp,
     pub description: Option<String>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<jiff_sqlx::Timestamp>,
     pub outcome: Option<String>,
     pub thumbnail_url: Option<String>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -45,13 +45,13 @@ struct GrowLogSummaryRow {
     id: i64,
     plant_id: i64,
     name: String,
-    started_at: DateTime<Utc>,
+    started_at: jiff_sqlx::Timestamp,
     description: Option<String>,
-    ended_at: Option<DateTime<Utc>>,
+    ended_at: Option<jiff_sqlx::Timestamp>,
     outcome: Option<String>,
     thumbnail_photo_id: Option<i64>,
-    inserted_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    inserted_at: jiff_sqlx::Timestamp,
+    updated_at: jiff_sqlx::Timestamp,
 }
 
 impl GrowLogSummaryRow {
@@ -80,11 +80,11 @@ impl GrowLogSummaryRow {
 pub struct Entry {
     pub id: i64,
     pub grow_log_id: i64,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: jiff_sqlx::Timestamp,
     pub stage: String,
     pub description: Option<String>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,8 +94,8 @@ pub struct Photo {
     pub original_filename: Option<String>,
     pub url: String,
     pub thumbnail_url: String,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 #[derive(Debug, Serialize)]
@@ -126,8 +126,8 @@ pub struct OwnedPhoto {
     pub storage_key: String,
     pub media_type: String,
     pub original_filename: Option<String>,
-    pub inserted_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub inserted_at: jiff_sqlx::Timestamp,
+    pub updated_at: jiff_sqlx::Timestamp,
 }
 
 pub async fn find_plant(pool: &PgPool, user_id: i64, plant_id: i64) -> Result<Plant, AppError> {
@@ -299,8 +299,8 @@ struct PhotoRow {
     id: i64,
     media_type: String,
     original_filename: Option<String>,
-    inserted_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    inserted_at: jiff_sqlx::Timestamp,
+    updated_at: jiff_sqlx::Timestamp,
 }
 
 impl PhotoRow {
@@ -397,20 +397,18 @@ pub fn validate_nonempty_field(field_name: &str, value: &str) -> Result<(), AppE
     Ok(())
 }
 
-pub fn parse_timestamp(field_name: &str, value: &str) -> Result<DateTime<Utc>, AppError> {
-    DateTime::parse_from_rfc3339(value)
-        .map(|timestamp| timestamp.with_timezone(&Utc))
-        .map_err(|_| {
-            AppError::Validation(vec![crate::error::FieldError {
-                field: field_name.to_owned(),
-                message: "must be a valid timestamp".to_owned(),
-            }])
-        })
+pub fn parse_timestamp(field_name: &str, value: &str) -> Result<Timestamp, AppError> {
+    value.parse::<Timestamp>().map_err(|_| {
+        AppError::Validation(vec![crate::error::FieldError {
+            field: field_name.to_owned(),
+            message: "must be a valid timestamp".to_owned(),
+        }])
+    })
 }
 
 pub fn validate_date_order(
-    started_at: DateTime<Utc>,
-    ended_at: Option<DateTime<Utc>>,
+    started_at: Timestamp,
+    ended_at: Option<Timestamp>,
 ) -> Result<(), AppError> {
     if ended_at.is_some_and(|end_timestamp| end_timestamp < started_at) {
         return Err(AppError::Validation(vec![crate::error::FieldError {

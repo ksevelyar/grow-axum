@@ -8,13 +8,13 @@ axum = { version = "0.8", features = ["multipart"] }
 axum-extra = { version = "0.12.6", features = ["cookie"] }
 bcrypt = "0.19.1"
 cookie = "0.18.1"
-chrono = { version = "0.4.44", features = ["serde"] }
-chrono-tz = "0.10.4"
+jiff = { version = "1.0", features = ["serde"] }
+jiff-sqlx = { version = "1.0", features = ["postgres", "serde"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "macros", "chrono"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "fs"] }
 tower-http = { version = "0.6", features = ["cors"] }
 uuid = { version = "1", features = ["v4"] }

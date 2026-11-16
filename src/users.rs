@@ -32,7 +32,7 @@ pub struct BackendUser {
 }
 
 pub async fn create(pool: &PgPool, payload: CreateUserPayload) -> Result<User, AppError> {
-    payload.timezone.parse::<chrono_tz::Tz>().map_err(|_| {
+    jiff::tz::TimeZone::get(&payload.timezone).map_err(|_| {
         AppError::Validation(vec![FieldError {
             field: "timezone".into(),
             message: "unknown timezone".into(),

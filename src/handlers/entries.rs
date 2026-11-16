@@ -2,7 +2,8 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum_extra::extract::cookie::CookieJar;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -68,7 +69,7 @@ pub async fn update(
          WHERE id = $4
          RETURNING id, grow_log_id, occurred_at, stage, description, inserted_at, updated_at",
     )
-    .bind(occurred_at)
+    .bind(occurred_at.to_sqlx())
     .bind(payload.stage)
     .bind(payload.description)
     .bind(entry_id)
@@ -110,7 +111,7 @@ pub async fn delete(
 async fn insert_entry(
     pool: &sqlx::PgPool,
     log_id: i64,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
     stage: &str,
     description: Option<String>,
 ) -> Result<Entry, AppError> {
@@ -120,7 +121,7 @@ async fn insert_entry(
          RETURNING id, grow_log_id, occurred_at, stage, description, inserted_at, updated_at",
     )
     .bind(log_id)
-    .bind(occurred_at)
+    .bind(occurred_at.to_sqlx())
     .bind(stage)
     .bind(description)
     .fetch_one(pool)
@@ -142,8 +143,8 @@ struct PhotoRow {
     id: i64,
     media_type: String,
     original_filename: Option<String>,
-    inserted_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    inserted_at: jiff_sqlx::Timestamp,
+    updated_at: jiff_sqlx::Timestamp,
 }
 
 impl PhotoRow {

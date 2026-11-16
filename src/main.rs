@@ -20,7 +20,7 @@ async fn main() {
         .await
         .expect("failed to run migrations");
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3020")
         .await
         .expect("failed to bind listener");
     axum::serve(

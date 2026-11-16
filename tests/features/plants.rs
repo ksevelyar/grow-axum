@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 #[sqlx::test]
-async fn user_creates_a_plant(pool: PgPool) {
+async fn user_creates_plant(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
 
@@ -30,7 +30,7 @@ async fn user_creates_a_plant(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_sees_a_plants_grow_logs_ordered_by_latest_entry(pool: PgPool) {
+async fn user_sees_plants_grow_logs_ordered_by_latest_entry(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
@@ -79,7 +79,7 @@ async fn user_sees_a_plants_grow_logs_ordered_by_latest_entry(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn user_cannot_delete_a_plant_with_grow_logs(pool: PgPool) {
+async fn user_cannot_delete_plant_with_grow_logs(pool: PgPool) {
     let (application, photo_storage_directory) = create_application(pool);
     let session_cookie = register_and_sign_in(&application, "grower@example.com").await;
     let plant = create_plant(&application, &session_cookie, "Mustard").await;
