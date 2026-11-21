@@ -1,13 +1,13 @@
 # Grow entries
 ## Requirements
-* All endpoints require an authenticated session and only expose the authenticated user's resources.
-* An entry belongs to one grow log and has required RFC 3339 `occurred_at` and `stage` fields.
-* Valid stages are `germination`, `seedling`, `vegetation`, and `bloom`.
-* `description` is optional. Log details order entries newest first by `occurred_at`, then id.
+* Users must sign in and can only access their own entries and photos.
+* An entry belongs to one grow log and has a date, stage, and optional description.
+* A grow has at most one entry per date.
+* Stages progress from germination to seedling, vegetation, and bloom. Stages may be skipped.
+* Log details show entries newest first.
 * A photo belongs to one entry. Each upload contains exactly one JPEG or PNG file and is limited to 10 MiB.
-* The server generates the storage key and returns original and thumbnail URLs. Thumbnails are JPEG images no larger than 1024 by 1024 pixels.
-* Photo reads use `Cache-Control: private, no-store`.
-* Deleting an entry or log deletes its photo records, originals, and thumbnails.
+* Photos have originals and JPEG thumbnails no larger than 1024 by 1024 pixels.
+* Deleting an entry or log also deletes its photos.
 
 ## User scenarios
 ### 1. User adds an entry to a grow log
@@ -177,3 +177,149 @@ Cache-Control: private, no-store
 ```
 
 The response body contains a JPEG thumbnail no larger than 1024 by 1024 pixels.
+
+### 7. A user cannot create an entry on an occupied date
+Mustard log `1` already has a vegetation entry on 15 April 2026.
+
+Request:
+```http
+POST /logs/1/entries
+Cookie: jwt=<jwt>
+```
+
+```json
+{
+  "occurred_at": "2026-04-15T12:00:00Z",
+  "stage": "vegetation"
+}
+```
+
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "occurred_at",
+      "message": "an entry already exists for this date"
+    }
+  ]
+}
+```
+
+### 8. A user cannot move an entry to an occupied date
+Mustard log `1` has vegetation entries on 1 and 15 April 2026. Entry `3` is the 15 April entry.
+
+Request:
+```http
+PATCH /entries/3
+Cookie: jwt=<jwt>
+```
+
+```json
+{
+  "occurred_at": "2026-04-01T12:00:00Z",
+  "stage": "vegetation"
+}
+```
+
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "occurred_at",
+      "message": "an entry already exists for this date"
+    }
+  ]
+}
+```
+
+### 9. A user cannot record an earlier stage
+Mustard log `1` entered vegetation on 1 April 2026 and bloom on 1 May.
+
+Request:
+```http
+POST /logs/1/entries
+Cookie: jwt=<jwt>
+```
+
+```json
+{
+  "occurred_at": "2026-05-06T10:30:00Z",
+  "stage": "vegetation"
+}
+```
+
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "stage",
+      "message": "must follow the order of the other entries"
+    }
+  ]
+}
+```
+
+### 10. A user cannot change an earlier entry to a later stage
+Mustard log `1` has vegetation entries on 1 and 15 April 2026. Entry `2` is the 1 April entry.
+
+Request:
+```http
+PATCH /entries/2
+Cookie: jwt=<jwt>
+```
+
+```json
+{
+  "occurred_at": "2026-04-01T10:30:00Z",
+  "stage": "bloom"
+}
+```
+
+Response, `422 Unprocessable Entity`:
+```json
+{
+  "error": "validation failed",
+  "fields": [
+    {
+      "field": "stage",
+      "message": "must follow the order of the other entries"
+    }
+  ]
+}
+```
+
+### 11. A user skips a stage
+Mustard log `1` has a germination entry on 20 March 2026.
+
+Request:
+```http
+POST /logs/1/entries
+Cookie: jwt=<jwt>
+```
+
+```json
+{
+  "occurred_at": "2026-04-01T10:30:00Z",
+  "stage": "vegetation"
+}
+```
+
+Response, `201 Created`:
+```json
+{
+  "id": 2,
+  "grow_log_id": 1,
+  "occurred_at": "2026-04-01T10:30:00Z",
+  "stage": "vegetation",
+  "description": null,
+  "inserted_at": "2026-04-01T10:30:00Z",
+  "updated_at": "2026-04-01T10:30:00Z",
+  "photos": []
+}
+```

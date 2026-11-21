@@ -35,14 +35,21 @@ pub async fn create(
     let payload = decode_json_request(payload)?;
     let occurred_at = parse_timestamp("occurred_at", &payload.occurred_at)?;
     validate_stage(&payload.stage)?;
-    let entry = insert_entry(
-        &state.pool,
-        log_id,
-        occurred_at,
-        &payload.stage,
-        payload.description,
+    let mut transaction = state.pool.begin().await?;
+    lock_grow_log(&mut transaction, log_id).await?;
+    validate_entry_order(&mut transaction, log_id, None, occurred_at, &payload.stage).await?;
+    let entry = sqlx::query_as::<_, Entry>(
+        "INSERT INTO grow_log_entries (grow_log_id, occurred_at, stage, description)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, grow_log_id, occurred_at, stage, description, inserted_at, updated_at",
     )
+    .bind(log_id)
+    .bind(occurred_at.to_sqlx())
+    .bind(&payload.stage)
+    .bind(payload.description)
+    .fetch_one(&mut *transaction)
     .await?;
+    transaction.commit().await?;
     Ok((
         StatusCode::CREATED,
         Json(EntryWithPhotos {
@@ -59,10 +66,21 @@ pub async fn update(
     payload: Result<Json<EntryPayload>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<EntryWithPhotos>, AppError> {
     let authenticated_user = authenticate_cookie(&state.pool, &cookie_jar).await?;
-    crate::grow_logs::find_entry(&state.pool, authenticated_user.id, entry_id).await?;
+    let existing_entry =
+        crate::grow_logs::find_entry(&state.pool, authenticated_user.id, entry_id).await?;
     let payload = decode_json_request(payload)?;
     let occurred_at = parse_timestamp("occurred_at", &payload.occurred_at)?;
     validate_stage(&payload.stage)?;
+    let mut transaction = state.pool.begin().await?;
+    lock_grow_log(&mut transaction, existing_entry.grow_log_id).await?;
+    validate_entry_order(
+        &mut transaction,
+        existing_entry.grow_log_id,
+        Some(entry_id),
+        occurred_at,
+        &payload.stage,
+    )
+    .await?;
     let entry = sqlx::query_as::<_, Entry>(
         "UPDATE grow_log_entries
          SET occurred_at = $1, stage = $2, description = $3, updated_at = NOW()
@@ -73,7 +91,7 @@ pub async fn update(
     .bind(payload.stage)
     .bind(payload.description)
     .bind(entry_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *transaction)
     .await?
     .ok_or(AppError::NotFound)?;
     let photos = sqlx::query_as::<_, PhotoRow>(
@@ -81,11 +99,12 @@ pub async fn update(
          FROM grow_log_entry_photos WHERE grow_log_entry_id = $1 ORDER BY id",
     )
     .bind(entry_id)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *transaction)
     .await?
     .into_iter()
     .map(PhotoRow::into_photo)
     .collect();
+    transaction.commit().await?;
     Ok(Json(EntryWithPhotos { entry, photos }))
 }
 
@@ -108,24 +127,66 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn insert_entry(
-    pool: &sqlx::PgPool,
+async fn lock_grow_log(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     log_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query("SELECT id FROM grow_logs WHERE id = $1 FOR UPDATE")
+        .bind(log_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(())
+}
+
+async fn validate_entry_order(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    log_id: i64,
+    entry_id: Option<i64>,
     occurred_at: Timestamp,
     stage: &str,
-    description: Option<String>,
-) -> Result<Entry, AppError> {
-    Ok(sqlx::query_as::<_, Entry>(
-        "INSERT INTO grow_log_entries (grow_log_id, occurred_at, stage, description)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, grow_log_id, occurred_at, stage, description, inserted_at, updated_at",
+) -> Result<(), AppError> {
+    let conflicting_date: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1 FROM grow_log_entries
+            WHERE grow_log_id = $1 AND ($2::bigint IS NULL OR id <> $2)
+              AND (occurred_at AT TIME ZONE 'UTC')::date = ($3::timestamptz AT TIME ZONE 'UTC')::date
+        )",
     )
     .bind(log_id)
+    .bind(entry_id)
     .bind(occurred_at.to_sqlx())
+    .fetch_one(&mut **transaction)
+    .await?;
+    if conflicting_date {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "occurred_at".to_owned(),
+            message: "an entry already exists for this date".to_owned(),
+        }]));
+    }
+
+    let conflicting_stage: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1 FROM grow_log_entries
+            WHERE grow_log_id = $1 AND ($2::bigint IS NULL OR id <> $2)
+              AND ((occurred_at < $3 AND array_position($4::text[], stage) > array_position($4::text[], $5::text))
+                OR (occurred_at > $3 AND array_position($4::text[], stage) < array_position($4::text[], $5::text)))
+        )",
+    )
+    .bind(log_id)
+    .bind(entry_id)
+    .bind(occurred_at.to_sqlx())
+    .bind(&VALID_STAGES[..])
     .bind(stage)
-    .bind(description)
-    .fetch_one(pool)
-    .await?)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if conflicting_stage {
+        return Err(AppError::Validation(vec![FieldError {
+            field: "stage".to_owned(),
+            message: "must follow the order of the other entries".to_owned(),
+        }]));
+    }
+    Ok(())
 }
 
 fn validate_stage(stage: &str) -> Result<(), AppError> {

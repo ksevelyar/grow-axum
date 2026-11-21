@@ -1,11 +1,9 @@
 # Sessions
 ## Requirements
-* `POST /sessions` authenticates an email and password.
-* A successful session sets an HTTP-only `jwt` cookie scoped to `/` for one year.
-* The cookie is secure outside debug builds.
-* `GET /sessions/current` returns the user identified by the `jwt` cookie.
+* Users sign in with an email address and password.
+* A successful sign-in creates a session lasting one year.
+* Users can view their current session.
 * Missing, invalid, expired, or deleted-user sessions are unauthorized.
-* `JWT_SECRET` must be configured to create or verify sessions.
 
 ## User scenarios
 ### 1. User signs in

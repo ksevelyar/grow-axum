@@ -1,12 +1,11 @@
 # Grow logs
 ## Requirements
-* All log endpoints require an authenticated session.
-* A grow log belongs to one owned plant. Its name and `started_at` are required.
-* `started_at` and `ended_at` are RFC 3339 timestamps. An end cannot precede its start.
-* Logs include optional `description`, `ended_at`, and `outcome`. A missing end means the log is active.
-* The `/logs` list is ordered by latest entry `occurred_at`, newest first. Logs without entries follow logs with entries. Log id descending breaks ties.
-* A log summary's thumbnail points to the newest photo across its entries, skipping entries without photos.
-* Resources belonging to another user return `404 Not Found`.
+* Users must sign in to manage their grow logs.
+* A grow log belongs to one of the user's plants and requires a name and start date.
+* A grow log may have a description, end date, and outcome. An end date cannot precede the start date. A log without an end date is active.
+* Grow logs are ordered by their latest entry, newest first. Logs without entries appear last.
+* A grow log's cover is its newest photo, even when its latest entry has no photo.
+* Users can only access their own grow logs.
 * Deleting a log also deletes its entries and photos.
 ## User scenarios
 ### 1. User creates a grow log

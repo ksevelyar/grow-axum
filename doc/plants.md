@@ -1,11 +1,11 @@
 # Plants
 ## Requirements
-* All plant endpoints require an authenticated session.
-* Plants belong to one user. Names are required, trimmed, and unique per user.
-* The `/plants` list is ordered by name and id.
-* A plant detail includes its grow logs ordered by latest entry `occurred_at`, newest first. Logs without entries follow logs with entries. Log id descending breaks ties.
-* Deleting a plant referenced by a log returns `409 Conflict`.
-* Resources belonging to another user return `404 Not Found`.
+* Users must sign in to manage their plants.
+* Plant names are required, trimmed, and unique per user.
+* Plants are listed by name.
+* A plant's grow logs are ordered by their latest entry, newest first. Logs without entries appear last.
+* A plant with grow logs cannot be deleted.
+* Users can only access their own plants.
 ## User scenarios
 ### 1. User creates a plant
 Request:

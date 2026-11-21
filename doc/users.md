@@ -1,10 +1,10 @@
 # Users
 ## Requirements
-* `POST /users` creates an account without an authenticated session.
-* `email`, `handle`, `password`, and `timezone` are required.
+* Users can create an account without signing in.
+* Email, handle, password, and time zone are required.
 * Email addresses and handles are unique. Email uniqueness is case-insensitive.
-* `timezone` must be an IANA timezone name.
-* Responses never include the password or its hash.
+* The time zone must be an IANA time zone name.
+* Users' passwords are not disclosed.
 
 ## User scenarios
 ### 1. User registers an account
